@@ -1,0 +1,49 @@
+steps:
+  # Create a timestamp for tagging
+  - name: 'ubuntu'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      echo $(date +%Y%m%d-%H%M%S) > /workspace/build-id.txt
+
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      BUILD_ID=$(cat /workspace/build-id.txt)
+      docker build -t gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$BUILD_ID .
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      BUILD_ID=$(cat /workspace/build-id.txt)
+      docker push gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$BUILD_ID
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+    - '-c'
+    - |
+      BUILD_ID=$(cat /workspace/build-id.txt)
+      gcloud run deploy ${_SERVICE_NAME} \
+        --image gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$BUILD_ID \
+        --region ${_REGION} \
+        --platform managed \
+        --service-account=${_SERVICE_ACCOUNT} \
+        ${_ENV_VARS}
+
+substitutions:
+  _REGION: us-central1  # default region
+  _SERVICE_ACCOUNT: ${PROJECT_NUMBER}-compute@developer.gserviceaccount.com  # default service account
+  _ENV_VARS: ""  # This will be populated by the deploy_server.sh script
+  _SERVICE_NAME: discord-bot  # default service name, can be overridden
+
+images:
+  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${BUILD_ID}'
