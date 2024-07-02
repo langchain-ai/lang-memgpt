@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# Google Cloud
+*.json
+
+# Virtual environment
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+policy.yaml

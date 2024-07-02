@@ -1,0 +1,58 @@
+[tool.poetry]
+name = "lang-memgpt"
+version = "0.0.1"
+description = "A simple memory-enabled agent for agents on LangGraph cloud."
+authors = ["William Fu-Hinthorn <13333726+hinthornw@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9.0,<3.13"
+langgraph = "^0.1.0"
+langchain-fireworks = "^0.1.3"
+# Feel free to swap out for postgres or your favorite database.
+langchain-pinecone = "^0.1.1"
+jsonpatch = "^1.33"
+dydantic = "^0.0.6"
+pytest-asyncio = "^0.23.7"
+trustcall = "^0.0.4"
+langchain = "^0.2.6"
+langchain-openai = "^0.1.10"
+langchain-anthropic = "^0.1.15"
+pydantic-settings = "^2.3.4"
+langgraph-sdk = "^0.1.23"
+langchain-community = "^0.2.6"
+tavily-python = "^0.3.3"
+tiktoken = "^0.7.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.4.10"
+mypy = "^1.10.0"
+pytest = "^8.2.2"
+langgraph-cli = "^0.1.43"
+
+[tool.ruff]
+lint.select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "D",    # pydocstyle
+    "D401", # First line should be in imperative mood
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 80
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
