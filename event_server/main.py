@@ -1,5 +1,4 @@
-"""
-Discord bot that integrates with LangGraph for AI-assisted conversations.
+"""Discord bot that integrates with LangGraph for AI-assisted conversations.
 
 This module sets up a Discord bot that can interact with users in Discord channels
 and threads. It uses LangGraph to process messages and generate responses.
@@ -48,8 +47,7 @@ async def on_ready():
 
 
 async def _get_assistant_id() -> str:
-    """
-    Retrieve or set the assistant ID for the bot.
+    """Retrieve or set the assistant ID for the bot.
 
     This function checks if an assistant ID is already set. If not, it fetches
     the first available assistant from the LangGraph client and sets it as the
@@ -76,8 +74,7 @@ async def _get_assistant_id() -> str:
 
 
 async def _get_thread(message: Message) -> discord.Thread:
-    """
-    Get or create a Discord thread for the given message.
+    """Get or create a Discord thread for the given message.
 
     If the message is already in a thread, return that thread.
     Otherwise, create a new thread in the channel where the message was sent.
@@ -96,8 +93,7 @@ async def _get_thread(message: Message) -> discord.Thread:
 
 
 async def _create_or_fetch_lg_thread(thread_id: uuid.UUID) -> Thread:
-    """
-    Create or fetch a LangGraph thread for the given thread ID.
+    """Create or fetch a LangGraph thread for the given thread ID.
 
     This function attempts to fetch an existing LangGraph thread. If it doesn't
     exist, a new thread is created.
@@ -116,8 +112,7 @@ async def _create_or_fetch_lg_thread(thread_id: uuid.UUID) -> Thread:
 
 
 def _format_inbound_message(message: Message) -> HumanMessage:
-    """
-    Format a Discord message into a HumanMessage for LangGraph processing.
+    """Format a Discord message into a HumanMessage for LangGraph processing.
 
     This function takes a Discord message and formats it into a structured
     HumanMessage object that includes context about the message's origin.
@@ -139,8 +134,7 @@ def _format_inbound_message(message: Message) -> HumanMessage:
 
 @BOT.event
 async def on_message(message: Message):
-    """
-    Event handler for incoming Discord messages.
+    """Event handler for incoming Discord messages.
 
     This function processes incoming messages, ignoring those sent by the bot itself.
     When the bot is mentioned, it creates or fetches the appropriate threads,
@@ -166,16 +160,19 @@ async def on_message(message: Message):
             config={
                 "configurable": {
                     "user_id": user_id,
+                    # "model": "accounts/fireworks/models/firefunction-v2"
                 }
             },
         )
         bot_message = run_result["messages"][-1]
-        await thread.send(bot_message["content"])
+        response = bot_message["content"]
+        if isinstance(response, list):
+            response = "".join([r["text"] for r in response])
+        await thread.send(response)
 
 
 async def health_check(request):
-    """
-    Health check endpoint for the web server.
+    """Health check endpoint for the web server.
 
     This function responds to GET requests on the /health endpoint with an "OK" message.
 
@@ -189,8 +186,7 @@ async def health_check(request):
 
 
 async def run_bot():
-    """
-    Run the Discord bot.
+    """Run the Discord bot.
 
     This function starts the Discord bot and handles any exceptions that occur during its operation.
     """
@@ -201,8 +197,7 @@ async def run_bot():
 
 
 async def run_web_server():
-    """
-    Run the web server for health checks.
+    """Run the web server for health checks.
 
     This function sets up and starts a simple web server that includes a health check endpoint.
     """
@@ -215,8 +210,7 @@ async def run_web_server():
 
 
 async def main():
-    """
-    Main function to run both the Discord bot and the web server concurrently.
+    """Main function to run both the Discord bot and the web server concurrently.
 
     This function uses asyncio.gather to run both the bot and the web server in parallel.
     """

@@ -17,7 +17,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 
 import langsmith
 import tiktoken
@@ -26,9 +26,9 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages.utils import get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.config import (
+    RunnableConfig,
     ensure_config,
     get_executor_for_config,
-    RunnableConfig,
 )
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
@@ -104,15 +104,18 @@ def search_memory(query: str, top_k: int = 5) -> list[str]:
     configurable = utils.ensure_configurable(config)
     embeddings = utils.get_embeddings()
     vector = embeddings.embed_query(query)
-    response = utils.get_index().query(
-        vector=vector,
-        filter={
-            "user_id": {"$eq": configurable["user_id"]},
-            constants.TYPE_KEY: {"$eq": "recall"},
-        },
-        namespace=settings.SETTINGS.pinecone_namespace,
-        top_k=top_k,
-    )
+    with langsmith.trace("query", inputs={"query": query, "top_k": top_k}) as rt:
+        response = utils.get_index().query(
+            vector=vector,
+            filter={
+                "user_id": {"$eq": configurable["user_id"]},
+                constants.TYPE_KEY: {"$eq": "recall"},
+            },
+            namespace=settings.SETTINGS.pinecone_namespace,
+            include_metadata=True,
+            top_k=top_k,
+        )
+        rt.end(outputs={"response": response})
     memories = []
     if matches := response.get("matches"):
         memories = [m["metadata"][constants.PAYLOAD_KEY] for m in matches]
@@ -189,41 +192,50 @@ prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are a helpful assistant with advanced long-term memory capabilities.\n"
-            "Powered by a stateless LLM, you must rely on external memory to store"
-            " information between conversations. Utilize the available memory tools to"
-            " store and retrieve important details that will help you better"
-            " attend to the user's needs and understand their context.\n\n"
+            "You are a helpful assistant with advanced long-term memory"
+            " capabilities. Powered by a stateless LLM, you must rely on"
+            " external memory to store information between conversations."
+            " Utilize the available memory tools to store and retrieve"
+            " important details that will help you better attend to the user's"
+            " needs and understand their context.\n\n"
             "Memory Usage Guidelines:\n"
-            "1. Actively use memory tools to build a comprehensive understanding of the user.\n"
-            "2. Make informed suppositions and extrapolations based on stored memories.\n"
-            "3. Regularly reflect on past interactions to identify patterns and preferences.\n"
-            "4. Update your mental model of the user with each new piece of information.\n"
-            "5. Cross-reference new information with existing memories for consistency.\n"
-            "6. Prioritize storing emotional context and personal values alongside facts.\n"
-            "7. Use memory to anticipate needs and tailor responses to the user's style.\n"
-            "8. Recognize and acknowledge changes in the user's situation or perspectives over time.\n"
-            "9. Leverage memories to provide personalized examples and analogies.\n"
-            "10. Recall past challenges or successes to inform current problem-solving.\n\n"
+            "1. Actively use memory tools (save_core_memory, save_recall_memory)"
+            " to build a comprehensive understanding of the user.\n"
+            "2. Make informed suppositions and extrapolations based on stored"
+            " memories.\n"
+            "3. Regularly reflect on past interactions to identify patterns and"
+            " preferences.\n"
+            "4. Update your mental model of the user with each new piece of"
+            " information.\n"
+            "5. Cross-reference new information with existing memories for"
+            " consistency.\n"
+            "6. Prioritize storing emotional context and personal values"
+            " alongside facts.\n"
+            "7. Use memory to anticipate needs and tailor responses to the"
+            " user's style.\n"
+            "8. Recognize and acknowledge changes in the user's situation or"
+            " perspectives over time.\n"
+            "9. Leverage memories to provide personalized examples and"
+            " analogies.\n"
+            "10. Recall past challenges or successes to inform current"
+            " problem-solving.\n\n"
             "## Core Memories\n"
-            "Core memories are fundamental to understanding the user and are always available:"
-            "\n{core_memories}\n\n"
+            "Core memories are fundamental to understanding the user and are"
+            " always available:\n{core_memories}\n\n"
             "## Recall Memories\n"
-            "Recall memories are contextually retrieved based on the current conversation:"
-            "\n{recall_memories}\n\n"
+            "Recall memories are contextually retrieved based on the current"
+            " conversation:\n{recall_memories}\n\n"
             "## Instructions\n"
-            "Engage with the user naturally, as a trusted colleague or friend. There's no need to"
-            " explicitly mention your memory capabilities. Instead, seamlessly incorporate your"
-            " understanding of the user into your responses. Be attentive to subtle cues and"
-            " underlying emotions. Adapt your communication style to match the user's preferences"
-            " and current emotional state.\n\n"
-            "Remember to:\n"
-            "- Acknowledge and build upon shared experiences or previous conversations.\n"
-            "- Demonstrate empathy by referencing past challenges or successes.\n"
-            "- Anticipate needs based on established patterns or preferences.\n"
-            "- Offer personalized suggestions or examples drawing from your memory.\n"
-            "- Recognize growth or changes in the user's perspective over time.\n"
-            "- Ask clarifying questions when new information seems to conflict with existing memories.\n\n"
+            "Engage with the user naturally, as a trusted colleague or friend."
+            " There's no need to explicitly mention your memory capabilities."
+            " Instead, seamlessly incorporate your understanding of the user"
+            " into your responses. Be attentive to subtle cues and underlying"
+            " emotions. Adapt your communication style to match the user's"
+            " preferences and current emotional state. Use tools to persist"
+            " information you want to retain in the next conversation. If you"
+            " do call tools, all text preceding the tool call is an internal"
+            " message. Respond AFTER calling the tool, once you have"
+            " confirmation that the tool completed successfully.\n\n"
             "Current system time: {current_time}\n\n",
         ),
         ("placeholder", "{messages}"),
