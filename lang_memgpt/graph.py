@@ -17,7 +17,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 
 import langsmith
 import tiktoken
@@ -26,9 +26,9 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages.utils import get_buffer_string
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.config import (
+    RunnableConfig,
     ensure_config,
     get_executor_for_config,
-    RunnableConfig,
 )
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
@@ -104,15 +104,18 @@ def search_memory(query: str, top_k: int = 5) -> list[str]:
     configurable = utils.ensure_configurable(config)
     embeddings = utils.get_embeddings()
     vector = embeddings.embed_query(query)
-    response = utils.get_index().query(
-        vector=vector,
-        filter={
-            "user_id": {"$eq": configurable["user_id"]},
-            constants.TYPE_KEY: {"$eq": "recall"},
-        },
-        namespace=settings.SETTINGS.pinecone_namespace,
-        top_k=top_k,
-    )
+    with langsmith.trace("query", inputs={"query": query, "top_k": top_k}) as rt:
+        response = utils.get_index().query(
+            vector=vector,
+            filter={
+                "user_id": {"$eq": configurable["user_id"]},
+                constants.TYPE_KEY: {"$eq": "recall"},
+            },
+            namespace=settings.SETTINGS.pinecone_namespace,
+            include_metadata=True,
+            top_k=top_k,
+        )
+        rt.end(outputs={"response": response})
     memories = []
     if matches := response.get("matches"):
         memories = [m["metadata"][constants.PAYLOAD_KEY] for m in matches]
@@ -219,7 +222,9 @@ prompt = ChatPromptTemplate.from_messages(
             " understanding of the user into your responses. Be attentive to subtle cues and"
             " underlying emotions. Adapt your communication style to match the user's preferences"
             " and current emotional state. Use tools to persist information you want to"
-            " retain in the next conversation.\n\n"
+            " retain in the next conversation. If you do call tools, all text preceding the tool"
+            " call is an internal message. Respond AFTER calling the tool, once you have"
+            " confirmation that the tool completed successfully.\n\n"
             "Current system time: {current_time}\n\n",
         ),
         ("placeholder", "{messages}"),
